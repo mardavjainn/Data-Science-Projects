@@ -1,197 +1,586 @@
+"""
+🎬 Movie Recommendation System — Streamlit Web Application
+==========================================================
+Dataset  : TMDB Movies Dataset 2023 (930K+ Movies)
+ML Model : Content-Based Filtering (CountVectorizer + Cosine Similarity)
+API      : TMDB API for posters & metadata
+Author   : Data Analytics Project (DAP)
+"""
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
 import requests
+import os
 from pathlib import Path
 
-# ───────────────────────── CONFIG ─────────────────────────
-TMDB_API_KEY = "YOUR_API_KEY"
+# ──────────────────────────────────────────────────────────────────────────────
+# CONFIG
+# ──────────────────────────────────────────────────────────────────────────────
+TMDB_API_KEY = "f882762ab569a7b595b61a89a3fab14a"
 TMDB_SEARCH_URL = "https://api.themoviedb.org/3/search/movie"
 TMDB_POSTER_BASE = "https://image.tmdb.org/t/p/w500"
-FALLBACK_POSTER = "https://via.placeholder.com/300x450?text=No+Image"
+FALLBACK_POSTER = "https://via.placeholder.com/300x450/8B1A1A/ffffff?text=No+Poster"
 ARTIFACTS_DIR = Path("artifacts")
 
-# ───────────────────────── PAGE ─────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# PAGE SETUP
+# ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Movie Recommender",
-    layout="wide"
+    page_title="MovieLens AI",
+    page_icon="🎬",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# ───────────────────────── NETFLIX STYLE CSS ─────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# CUSTOM CSS — Light Red & White Theme
+# ──────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-
-/* Background */
-body, .stApp {
-    background-color: #ffffff;
-    color: #111111;
-    font-family: 'Inter', sans-serif;
+/* ── Base ── */
+html, body, [data-testid="stAppViewContainer"] {
+    background-color: #FFF5F5;
+    color: #2d1515;
+    font-family: 'Segoe UI', sans-serif;
 }
-
-/* Sidebar */
 [data-testid="stSidebar"] {
-    background-color: #f8f9fa;
-    border-right: 1px solid #e5e7eb;
-}
-
-/* Title */
-h1 {
-    color: #e50914;
-}
-
-/* Buttons */
-.stButton > button {
-    background-color: #e50914;
-    color: white;
-    border-radius: 6px;
-    padding: 10px;
-    border: none;
-    font-weight: 600;
-}
-.stButton > button:hover {
-    background-color: #b20710;
-}
-
-/* Cards */
-.card {
     background-color: #ffffff;
-    padding: 10px;
-    border-radius: 10px;
+    border-right: 2px solid #f4c2c2;
+}
+[data-testid="stSidebar"] * {
+    color: #2d1515 !important;
+}
+
+/* ── Hero banner ── */
+.hero-banner {
+    background: linear-gradient(135deg, #8B1A1A 0%, #B22222 50%, #CD5C5C 100%);
+    border-radius: 16px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #f4c2c2;
     text-align: center;
-    border: 1px solid #e5e7eb;
-    transition: 0.2s;
 }
-.card:hover {
-    transform: scale(1.03);
-    box-shadow: 0px 6px 20px rgba(0,0,0,0.1);
-}
+.hero-banner h1 { font-size: 2.6rem; margin: 0; color: #ffffff; }
+.hero-banner p  { font-size: 1.05rem; color: #ffe4e4; margin-top: 0.4rem; }
 
-/* Image */
-.card img {
-    border-radius: 8px;
+/* ── Movie card ── */
+.movie-card {
+    background: #ffffff;
+    border: 1px solid #f4c2c2;
+    border-radius: 12px;
+    padding: 0.8rem;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+}
+.movie-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(139,26,26,0.18);
+    border-color: #B22222;
+}
+.movie-card img {
     width: 100%;
+    border-radius: 8px;
+    object-fit: cover;
+    height: 280px;
+}
+.movie-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #8B1A1A;
+    margin: 0.5rem 0 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.movie-meta {
+    font-size: 0.78rem;
+    color: #6b3030;
+}
+.badge {
+    display: inline-block;
+    background: #fff0f0;
+    border: 1px solid #f4c2c2;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 0.75rem;
+    color: #B22222;
+    margin: 2px;
+}
+.rating-star { color: #e05c00; }
+
+/* ── Section header ── */
+.section-header {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #8B1A1A;
+    border-left: 4px solid #B22222;
+    padding-left: 0.7rem;
+    margin: 1.5rem 0 1rem;
 }
 
-/* Text */
-.card h4 {
-    font-size: 0.95rem;
-    margin-top: 8px;
+/* ── Input & button ── */
+[data-testid="stSelectbox"] > div > div {
+    background-color: #ffffff;
+    border: 1px solid #f4c2c2;
+    border-radius: 8px;
+    color: #2d1515;
 }
-.small {
-    font-size: 0.8rem;
-    color: #6b7280;
+.stButton > button {
+    background: linear-gradient(90deg, #B22222, #8B1A1A);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 0.6rem 2.5rem;
+    border-radius: 8px;
+    border: none;
+    width: 100%;
+    transition: opacity 0.2s;
+}
+.stButton > button:hover { opacity: 0.85; }
+
+/* ── Trending card ── */
+.trend-card {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 0.6rem;
+    border: 1px solid #f4c2c2;
+    text-align: center;
+}
+.trend-card img { width:100%; height:160px; object-fit:cover; border-radius:6px; }
+.trend-title { font-size:0.8rem; color:#8B1A1A; margin-top:0.4rem; font-weight:600;
+               white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.trend-rating { font-size:0.75rem; color:#6b3030; }
+
+/* ── Overview box ── */
+.overview-box {
+    background: #fff0f0;
+    border-left: 3px solid #B22222;
+    border-radius: 0 8px 8px 0;
+    padding: 0.9rem 1.2rem;
+    color: #2d1515;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-top: 0.4rem;
 }
 
+/* ── Metric chips ── */
+.metric-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #fff0f0; border: 1px solid #f4c2c2;
+    border-radius: 20px; padding: 4px 12px;
+    font-size: 0.8rem; color: #8B1A1A; margin: 3px;
+}
+
+/* ── Headings & text in main area ── */
+h1, h2, h3, h4 { color: #8B1A1A !important; }
+p, li, span, div { color: #2d1515; }
+
+/* ── Dataframe ── */
+[data-testid="stDataFrame"] { border: 1px solid #f4c2c2; border-radius: 8px; }
+
+/* ── Expander ── */
+[data-testid="stExpander"] {
+    border: 1px solid #f4c2c2 !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+}
+
+/* ── Metric widgets in sidebar ── */
+[data-testid="stMetric"] {
+    background: #fff0f0;
+    border: 1px solid #f4c2c2;
+    border-radius: 8px;
+    padding: 0.5rem;
+}
+[data-testid="stMetricValue"] { color: #8B1A1A !important; }
+[data-testid="stMetricLabel"] { color: #6b3030 !important; }
+
+/* ── Slider accent ── */
+[data-testid="stSlider"] [role="slider"] { background-color: #B22222 !important; }
+
+/* ── Info / warning / error boxes ── */
+[data-testid="stAlert"] { border-radius: 8px; }
+
+/* ── Spinner ── */
+[data-testid="stSpinner"] { color: #B22222; }
 </style>
 """, unsafe_allow_html=True)
 
-# ───────────────────────── LOAD DATA ─────────────────────────
-@st.cache_data
-def load_data():
-    with open(ARTIFACTS_DIR / "movie_dict.pkl", "rb") as f:
-        movie_dict = pickle.load(f)
 
-    with open(ARTIFACTS_DIR / "similarity.pkl", "rb") as f:
+# ──────────────────────────────────────────────────────────────────────────────
+# DATA LOADING
+# ──────────────────────────────────────────────────────────────────────────────
+@st.cache_data(show_spinner=False)
+def load_artifacts():
+    """Load pre-built movie dictionary and similarity matrix from artifacts/."""
+    movie_dict_path = ARTIFACTS_DIR / "movie_dict.pkl"
+    similarity_path = ARTIFACTS_DIR / "similarity.pkl"
+
+    if not movie_dict_path.exists() or not similarity_path.exists():
+        return None, None
+
+    with open(movie_dict_path, "rb") as f:
+        movie_dict = pickle.load(f)
+    with open(similarity_path, "rb") as f:
         similarity = pickle.load(f)
 
-    return pd.DataFrame(movie_dict), similarity
+    movies_df = pd.DataFrame(movie_dict)
+    return movies_df, similarity
 
-# ───────────────────────── TMDB API ─────────────────────────
-@st.cache_data
-def fetch_movie(title):
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TMDB API HELPERS
+# ──────────────────────────────────────────────────────────────────────────────
+@st.cache_data(show_spinner=False, ttl=3600)
+def fetch_tmdb_data(movie_title: str, year: int = None):
+    """
+    Fetch poster URL, overview, and rating from TMDB by movie title.
+    Returns dict with keys: poster_url, overview, rating, tmdb_id
+    """
     try:
-        params = {"api_key": TMDB_API_KEY, "query": title}
-        res = requests.get(TMDB_SEARCH_URL, params=params).json()
+        params = {
+            "api_key": TMDB_API_KEY,
+            "query": movie_title,
+            "language": "en-US",
+            "page": 1,
+        }
+        if year and not np.isnan(year):
+            params["year"] = int(year)
 
-        if res["results"]:
-            movie = res["results"][0]
-            poster = movie.get("poster_path")
+        resp = requests.get(TMDB_SEARCH_URL, params=params, timeout=5)
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+
+        if not results:
+            params.pop("year", None)
+            resp = requests.get(TMDB_SEARCH_URL, params=params, timeout=5)
+            results = resp.json().get("results", [])
+
+        if results:
+            r = results[0]
+            poster_path = r.get("poster_path")
             return {
-                "poster": TMDB_POSTER_BASE + poster if poster else FALLBACK_POSTER,
-                "rating": movie.get("vote_average", 0)
+                "poster_url": TMDB_POSTER_BASE + poster_path if poster_path else FALLBACK_POSTER,
+                "overview":   r.get("overview", ""),
+                "rating":     r.get("vote_average", 0.0),
+                "tmdb_id":    r.get("id"),
             }
-    except:
+    except Exception:
         pass
 
-    return {"poster": FALLBACK_POSTER, "rating": 0}
+    return {"poster_url": FALLBACK_POSTER, "overview": "", "rating": 0.0, "tmdb_id": None}
 
-# ───────────────────────── RECOMMENDATION ─────────────────────────
-def recommend(movie, df, similarity):
-    index = df[df["title"] == movie].index[0]
-    distances = similarity[index]
-    movies = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:11]
 
-    result = []
-    for i in movies:
-        result.append(df.iloc[i[0]])
-    return pd.DataFrame(result)
+@st.cache_data(show_spinner=False, ttl=1800)
+def fetch_trending():
+    """Fetch trending movies from TMDB."""
+    try:
+        url = f"https://api.themoviedb.org/3/trending/movie/week?api_key={TMDB_API_KEY}"
+        resp = requests.get(url, timeout=6)
+        resp.raise_for_status()
+        return resp.json().get("results", [])[:10]
+    except Exception:
+        return []
 
-# ───────────────────────── CARD UI ─────────────────────────
-def movie_card(title, poster, rating):
+
+# ──────────────────────────────────────────────────────────────────────────────
+# RECOMMENDATION LOGIC
+# ──────────────────────────────────────────────────────────────────────────────
+def get_recommendations(selected_title: str, movies_df: pd.DataFrame,
+                         similarity: np.ndarray, top_n: int = 10) -> pd.DataFrame:
+    """
+    Return top_n recommended movies for selected_title.
+    Uses cosine similarity scores from pre-computed matrix.
+    """
+    titles = movies_df["title"].tolist()
+    idx = next((i for i, t in enumerate(titles) if t == selected_title), None)
+    if idx is None:
+        return pd.DataFrame()
+
+    sim_scores = list(enumerate(similarity[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = [s for s in sim_scores if s[0] != idx][:top_n]
+
+    rec_indices = [s[0] for s in sim_scores]
+    rec_similarity = [round(s[1], 4) for s in sim_scores]
+
+    recs = movies_df.iloc[rec_indices].copy().reset_index(drop=True)
+    recs["similarity_score"] = rec_similarity
+    return recs
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# UI COMPONENTS
+# ──────────────────────────────────────────────────────────────────────────────
+def render_movie_card(title: str, year, rating, poster_url: str,
+                      overview: str = "", similarity: float = None):
+    """Render a single movie card as HTML."""
+    year_str = str(int(year)) if year and not (isinstance(year, float) and np.isnan(year)) else "N/A"
+    rating_str = f"⭐ {rating:.1f}" if rating else "N/A"
+    sim_str = f"<br><span class='badge'>🔗 {similarity:.0%} match</span>" if similarity else ""
+    overview_trunc = (overview[:120] + "…") if len(overview) > 120 else overview
+    overview_html = f"<div class='overview-box'>{overview_trunc}</div>" if overview_trunc else ""
+
     return f"""
-    <div class="card">
-        <img src="{poster}">
-        <h4>{title}</h4>
-        <p class="small">⭐ {rating}</p>
+    <div class='movie-card'>
+        <img src='{poster_url}' alt='{title}' onerror="this.src='{FALLBACK_POSTER}'" />
+        <div class='movie-title' title='{title}'>{title}</div>
+        <div class='movie-meta'>
+            <span class='metric-chip'>📅 {year_str}</span>
+            <span class='metric-chip rating-star'>{rating_str}</span>
+            {sim_str}
+        </div>
+        {overview_html}
     </div>
     """
 
-# ───────────────────────── MAIN APP ─────────────────────────
-def main():
-    # Header
-    st.markdown("<h1>🎬 Movie Recommender</h1>", unsafe_allow_html=True)
-    st.caption("Discover movies you’ll love")
 
-    df, similarity = load_data()
-
-    # Sidebar
+# ──────────────────────────────────────────────────────────────────────────────
+# SIDEBAR FILTERS
+# ──────────────────────────────────────────────────────────────────────────────
+def render_sidebar(movies_df):
     with st.sidebar:
-        st.header("Filters")
+        st.markdown("### 🎛️ Filters")
 
-        genres = ["All"] + sorted(set(" ".join(df["genres"].dropna()).split()))
-        selected_genre = st.selectbox("Genre", genres)
+        # Genre filter
+        all_genres = set()
+        for g in movies_df["genres"].dropna():
+            if isinstance(g, str):
+                for genre in g.replace(",", " ").split():
+                    if len(genre) > 2:
+                        all_genres.add(genre.strip().capitalize())
+        genres_sorted = ["All"] + sorted(all_genres)
+        selected_genre = st.selectbox("🎭 Genre", genres_sorted)
 
-        years = df["year"].dropna().astype(int)
-        year_range = st.slider("Year", int(years.min()), int(years.max()), (2000, int(years.max())))
+        # Year range
+        years = movies_df["year"].dropna().astype(int)
+        min_y, max_y = int(years.min()), int(years.max())
+        year_range = st.slider("📅 Release Year", min_y, max_y, (max(min_y, 1990), max_y))
 
-    # Filtering
-    filtered = df.copy()
+        # Minimum rating
+        min_rating = st.slider("⭐ Min Rating", 0.0, 10.0, 5.0, 0.5)
 
+        # Number of recommendations
+        top_n = st.slider("🔢 Recommendations", 5, 20, 10)
+
+        st.markdown("---")
+        st.markdown("### 📊 Dataset Stats")
+        st.metric("Total Movies (ML)", f"{len(movies_df):,}")
+        avg_r = movies_df["vote_average"].mean()
+        st.metric("Avg Rating", f"{avg_r:.2f} ⭐")
+
+        st.markdown("---")
+        st.markdown(
+            "<div style='font-size:0.75rem;color:#9b4444;'>Powered by TMDB API · "
+            "Content-Based Filtering · Cosine Similarity</div>",
+            unsafe_allow_html=True,
+        )
+
+    return selected_genre, year_range, min_rating, top_n
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# MAIN APP
+# ──────────────────────────────────────────────────────────────────────────────
+def main():
+    # ── Hero banner ──
+    st.markdown("""
+    <div class='hero-banner'>
+        <h1>🎬 MovieLens AI</h1>
+        <p>Content-Based Movie Recommendation System · TMDB 930K+ Movies · ML-Powered</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Load data ──
+    movies_df, similarity = load_artifacts()
+
+    if movies_df is None:
+        st.error("⚠️ Artifacts not found. Please run `notebook.ipynb` first to generate `artifacts/movie_dict.pkl` and `artifacts/similarity.pkl`.")
+        st.info(
+            "**Steps to fix:**\n"
+            "1. Download TMDB dataset from Kaggle\n"
+            "2. Place `TMDB_movie_dataset_v11.csv` in the project folder\n"
+            "3. Run all cells in `notebook.ipynb`\n"
+            "4. Restart this Streamlit app"
+        )
+
+        # Demo mode with TMDB trending data
+        st.markdown("<div class='section-header'>🔥 Trending Movies (Demo Mode)</div>", unsafe_allow_html=True)
+        trending = fetch_trending()
+        if trending:
+            cols = st.columns(5)
+            for i, movie in enumerate(trending[:5]):
+                with cols[i]:
+                    poster = TMDB_POSTER_BASE + movie.get("poster_path", "") if movie.get("poster_path") else FALLBACK_POSTER
+                    st.image(poster, use_column_width=True)
+                    st.caption(f"**{movie.get('title', 'Unknown')}**\n⭐ {movie.get('vote_average', 0):.1f}")
+        return
+
+    # ── Sidebar ──
+    selected_genre, year_range, min_rating, top_n = render_sidebar(movies_df)
+
+    # ── Apply filters for dropdown ──
+    filtered = movies_df.copy()
     if selected_genre != "All":
-        filtered = filtered[filtered["genres"].str.contains(selected_genre, case=False, na=False)]
-
+        filtered = filtered[
+            filtered["genres"].str.contains(selected_genre, case=False, na=False)
+        ]
     filtered = filtered[
-        (filtered["year"] >= year_range[0]) &
-        (filtered["year"] <= year_range[1])
+        (filtered["year"].fillna(0).astype(int) >= year_range[0]) &
+        (filtered["year"].fillna(9999).astype(int) <= year_range[1])
     ]
+    filtered = filtered[filtered["vote_average"] >= min_rating]
+    filtered = filtered.sort_values("popularity", ascending=False)
 
-    movie_list = filtered["title"].dropna().tolist()
+    movie_titles = filtered["title"].dropna().tolist()
 
-    # Select movie
-    selected_movie = st.selectbox("Select a movie", movie_list)
+    if not movie_titles:
+        st.warning("No movies match the current filters. Try widening your search.")
+        return
 
-    if st.button("Recommend"):
-        recs = recommend(selected_movie, df, similarity)
+    # ── Movie search ──
+    st.markdown("<div class='section-header'>🔍 Find Your Movie</div>", unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.subheader("🎯 Recommended for you")
+    col_search, col_btn = st.columns([4, 1])
+    with col_search:
+        selected_movie = st.selectbox(
+            "Search or select a movie:",
+            movie_titles,
+            label_visibility="collapsed",
+            placeholder="Type a movie name…",
+        )
+    with col_btn:
+        recommend_btn = st.button("🎯 Recommend", use_container_width=True)
 
-        cols = st.columns(5)
+    # ── Selected movie info ──
+    if selected_movie:
+        row = movies_df[movies_df["title"] == selected_movie].iloc[0]
+        tmdb_data = fetch_tmdb_data(
+            selected_movie,
+            row.get("year") if "year" in row.index else None,
+        )
 
-        for i, (_, row) in enumerate(recs.iterrows()):
-            data = fetch_movie(row["title"])
+        col_img, col_info = st.columns([1, 3])
+        with col_img:
+            st.image(tmdb_data["poster_url"], width=200)
+        with col_info:
+            yr = str(int(row["year"])) if "year" in row.index and row["year"] and not np.isnan(float(row["year"])) else "N/A"
+            st.markdown(f"### {selected_movie} ({yr})")
+            rating = tmdb_data["rating"] or row.get("vote_average", 0)
+            st.markdown(
+                f"<span class='metric-chip rating-star'>⭐ {rating:.1f}/10</span>"
+                f"<span class='metric-chip'>🎭 {row.get('genres', 'N/A')}</span>"
+                f"<span class='metric-chip'>🔥 Popularity: {row.get('popularity', 0):.0f}</span>",
+                unsafe_allow_html=True,
+            )
+            overview = tmdb_data["overview"] or row.get("overview", "")
+            if overview:
+                st.markdown(f"<div class='overview-box'>{overview}</div>", unsafe_allow_html=True)
 
-            with cols[i % 5]:
+    # ── Recommendations ──
+    if recommend_btn and selected_movie:
+        with st.spinner(f"🤖 Finding movies similar to **{selected_movie}**…"):
+            recs = get_recommendations(selected_movie, movies_df, similarity, top_n)
+
+        if len(recs) == 0:
+            st.warning("Could not find recommendations. Try a different movie.")
+        else:
+            st.markdown(
+                f"<div class='section-header'>🎯 Top {len(recs)} Recommendations for '{selected_movie}'</div>",
+                unsafe_allow_html=True,
+            )
+
+            COLS_PER_ROW = 5
+            rows = [recs.iloc[i:i+COLS_PER_ROW] for i in range(0, len(recs), COLS_PER_ROW)]
+
+            for row_df in rows:
+                cols = st.columns(COLS_PER_ROW)
+                for col, (_, movie_row) in zip(cols, row_df.iterrows()):
+                    tmdb = fetch_tmdb_data(
+                        movie_row["title"],
+                        movie_row.get("year"),
+                    )
+                    yr = movie_row.get("year")
+                    rating = tmdb["rating"] or movie_row.get("vote_average", 0)
+                    overview = tmdb.get("overview", "")
+                    sim_score = movie_row.get("similarity_score")
+
+                    with col:
+                        st.markdown(
+                            render_movie_card(
+                                title=movie_row["title"],
+                                year=yr,
+                                rating=rating,
+                                poster_url=tmdb["poster_url"],
+                                overview=overview,
+                                similarity=sim_score,
+                            ),
+                            unsafe_allow_html=True,
+                        )
+
+            # ── Recommendation explanation ──
+            with st.expander("🧠 Why these movies were recommended"):
                 st.markdown(
-                    movie_card(
-                        row["title"],
-                        data["poster"],
-                        data["rating"]
-                    ),
-                    unsafe_allow_html=True
+                    "These movies were selected based on **cosine similarity** computed over "
+                    "a content vector that combines:\n"
+                    "- 🎭 **Genres** (Action, Comedy, Drama…)\n"
+                    "- 📝 **Plot Overview** (TF-IDF text representation)\n"
+                    "- 🏷️ **Keywords** (if available)\n\n"
+                    "Movies with higher similarity scores share more content features "
+                    "with your selected movie."
+                )
+                st.dataframe(
+                    recs[["title", "genres", "year", "vote_average", "similarity_score"]]
+                    .rename(columns={
+                        "title": "Title", "genres": "Genres", "year": "Year",
+                        "vote_average": "Rating", "similarity_score": "Similarity"
+                    }),
+                    use_container_width=True,
                 )
 
-# ───────────────────────── RUN ─────────────────────────
+    # ── Trending section ──
+    st.markdown("<div class='section-header'>🔥 Trending This Week</div>", unsafe_allow_html=True)
+    trending = fetch_trending()
+
+    if trending:
+        trend_cols = st.columns(10)
+        for i, movie in enumerate(trending[:10]):
+            with trend_cols[i]:
+                poster = (
+                    TMDB_POSTER_BASE + movie["poster_path"]
+                    if movie.get("poster_path")
+                    else FALLBACK_POSTER
+                )
+                st.markdown(
+                    f"""<div class='trend-card'>
+                        <img src='{poster}' onerror="this.src='{FALLBACK_POSTER}'" />
+                        <div class='trend-title' title='{movie.get("title","")}'>{movie.get("title","")}</div>
+                        <div class='trend-rating'>⭐ {movie.get("vote_average",0):.1f}</div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+    else:
+        st.info("Could not load trending movies. Check your internet connection.")
+
+    # ── Top rated from dataset ──
+    st.markdown("<div class='section-header'>🏆 Top Rated in Dataset</div>", unsafe_allow_html=True)
+    top_rated = (
+        movies_df[movies_df["vote_average"] >= 7.0]
+        .sort_values(["vote_average", "popularity"], ascending=False)
+        .head(10)
+    )
+    tr_cols = st.columns(5)
+    for i, (_, row) in enumerate(top_rated.head(5).iterrows()):
+        tmdb = fetch_tmdb_data(row["title"], row.get("year"))
+        with tr_cols[i]:
+            st.image(tmdb["poster_url"], use_column_width=True)
+            yr = str(int(row["year"])) if "year" in row.index and row["year"] and not np.isnan(float(row["year"])) else ""
+            st.caption(f"**{row['title']}** ({yr})\n⭐ {tmdb['rating'] or row.get('vote_average', 0):.1f}")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     main()
