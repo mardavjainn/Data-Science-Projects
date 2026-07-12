@@ -1,127 +1,85 @@
-# 🎬 Movie Recommendation System — Data Analytics Project (DAP)
+# Movie Recommendation System
 
-A complete end-to-end **Content-Based Movie Recommendation System** built with Python, Scikit-learn, and Streamlit, using the TMDB Movies Dataset (930K+ movies).
+A complete **Content-Based Movie Recommendation System** built using **Python, Scikit-learn, and Streamlit** on the TMDB Movies Dataset (930K+ movies). The project combines **Exploratory Data Analysis (EDA)**, feature engineering, and machine learning to recommend similar movies based on their content.
 
----
-
-## 📁 Project Structure
-
-```text
-A031_DAP/
-├── Data Analytics/
-│   ├── 01_Python_Basics.ipynb
-│   ├── 02_Data_Structures.ipynb
-│   ├── 03_SQLite_Database.ipynb
-│   ├── 04_NumPy_Pandas.ipynb
-│   ├── 05_TMDB_EDA.ipynb
-│   └── 06_Data_Visualization.ipynb
-├── Artifacts/                 # Generated model files (ignored by Git)
-├── app.py                     # Streamlit web application
-├── DAP_TMDB_MovieRecommendation.ipynb
-├── README.md
-├── requirements.txt
-└── .gitignore
-```
+**Live Demo:** https://my-cine-match.streamlit.app/
 
 ---
 
-## 🚀 Quick Start
+## Project Goal
 
-### 1. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Download Dataset
-Download from Kaggle: https://www.kaggle.com/datasets/asaniczka/tmdb-movies-dataset-2023-930k-movies  
-Place `TMDB_movie_dataset_v11.csv` in the project root.
-
-### 3. Run the Jupyter Notebook
-```bash
-jupyter notebook notebook.ipynb
-```
-Run all cells — this generates `artifacts/movie_dict.pkl` and `artifacts/similarity.pkl`.
-
-### 4. Launch the Streamlit App
-```bash
-streamlit run app.py
-```
+The objective of this project is to build an end-to-end movie recommendation system that analyzes movie metadata, performs exploratory data analysis, and recommends similar movies using a content-based filtering approach.
 
 ---
 
-## 🧠 ML Approach
+## Dataset
 
-| Component | Detail |
-|-----------|--------|
-| Dataset | TMDB 930K+ movies (50K sampled for EDA, 15K for ML) |
-| Features | genres + overview + keywords → `tags` |
-| Vectorisation | `CountVectorizer` (max_features=5000, stop_words='english') |
-| Similarity | Cosine Similarity |
-| Output | Top-10 most similar movies per input |
-
-### Why Content-Based?
-- No user history required
-- Works on cold-start (new movies)
-- Interpretable recommendations
+**Source:** https://www.kaggle.com/datasets/asaniczka/tmdb-movies-dataset-2023-930k-movies
 
 ---
 
-## 📊 EDA Visualisations
+## Data Analytics
 
-- Top 15 Genre Distribution
-- Rating Distribution & Box Plot by Decade
-- Year-wise Movie Release Trends
-- Most Popular Movies
-- Popularity vs Rating Scatter Plot
-- Feature Correlation Heatmap
-- Top 10 Highest Revenue Movies
-- Cosine Similarity Score Distribution
+The repository also includes a dedicated **Data Analytics** folder containing notebooks on:
 
----
-
-## 🌐 Streamlit App Features
-
-- 🔍 **Movie Search** — searchable dropdown with 15K+ titles
-- 🎛️ **Filters** — Genre / Year Range / Min Rating
-- 🎯 **Recommendations** — Top-N similar movies in grid layout
-- 🖼️ **TMDB Posters** — fetched live via TMDB API
-- 🔥 **Trending** — TMDB weekly trending section
-- 🧠 **Explanation** — why each movie was recommended
-- 💾 **Caching** — `st.cache_data` for fast API responses
+* Python Fundamentals
+* Data Structures
+* SQLite
+* NumPy & Pandas
+* TMDB Exploratory Data Analysis
+* Data Visualization
 
 ---
 
-## ⚠️ Limitations
+## Machine Learning
 
-1. **Subset only**: ML model trained on top 15K movies (by vote count) for performance
-2. **No collaborative filtering**: Pure content-based (no user ratings)
-3. **TMDB API mismatch**: Poster search by title may return incorrect results for obscure films
-4. **Text quality**: Short or missing overviews reduce recommendation accuracy
+A **Content-Based Recommendation System** was developed using the following workflow:
 
----
+* Data Cleaning & Feature Engineering
+* Text Vectorization using CountVectorizer
+* Cosine Similarity
+* Movie Recommendation Generation
 
-## 🔮 Possible Improvements
+### Model Details
 
-- Add collaborative filtering (SVD / NMF)
-- Use sentence-transformers for semantic embeddings
-- Include cast/director metadata
-- Add YouTube trailer integration
-- Deploy on Streamlit Cloud / Hugging Face Spaces
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Data | Pandas, NumPy |
-| Visualisation | Matplotlib, Seaborn, Plotly |
-| ML | Scikit-learn (CountVectorizer, Cosine Similarity) |
-| Web App | Streamlit |
-| API | TMDB REST API |
-| Storage | Pickle (.pkl) |
+* **Dataset:** TMDB Movies Dataset (930K+ Movies)
+* **Training Data:** Top 15K movies selected for model building
+* **Vectorizer:** CountVectorizer
+* **Similarity Measure:** Cosine Similarity
 
 ---
 
-**Academic Project** · Data Analytics Project (DAP)  
-Dataset © TMDB / Kaggle · API © The Movie Database
+## Streamlit Application
+
+The web application includes:
+
+* Movie Search
+* Genre, Year and Rating Filters
+* Top-N Movie Recommendations
+* TMDB Movie Posters
+* Trending Movies
+* Recommendation Explanation
+
+---
+
+## Limitations
+
+* Recommendations are based only on movie content.
+* User preferences and ratings are not considered.
+* Poster information depends on the TMDB API.
+
+---
+
+## Future Improvements
+
+* Collaborative Filtering
+* Semantic Embeddings
+* Cast and Director-Based Recommendations
+* Trailer Integration
+* Cloud Deployment Enhancements
+
+---
+
+## Project Outcome
+
+This project demonstrates an end-to-end workflow involving **Exploratory Data Analysis, Feature Engineering, Machine Learning, and Streamlit Deployment** to build a practical movie recommendation system.
